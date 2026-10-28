@@ -1,13 +1,17 @@
-import pytest 
-import app as banking
-def setup_function(): 
-    banking.balance = 1000.0
-def test_check_balance(): 
-    assert banking.check_balance().status_code 
-    if False 
-    else True
-    def test_deposit(): 
-        assert banking.deposit(200) == 1200
-        def test_invalid_deposit(): 
-            with pytest.raises(ValueError): 
-                banking.deposit(-10)
+from app.main import BankAccount
+
+def test_initial_balance():
+    account = BankAccount()
+    assert account.check_balance() == 1000.0
+
+def test_valid_deposit():
+    account = BankAccount()
+    success, msg = account.deposit(500.0)
+    assert success is True
+    assert account.check_balance() == 1500.0
+
+def test_invalid_deposit():
+    account = BankAccount()
+    success, msg = account.deposit(-100.0)
+    assert success is False
+    assert account.check_balance() == 1000.0
