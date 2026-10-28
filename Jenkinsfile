@@ -1,64 +1,83 @@
 pipeline {
     agent any
 
-    parameters {
-        choice(name: 'TRANSACTION_TYPE', choices: ['Check Balance', 'Deposit', 'Withdraw'], description: 'Select the banking operation')
-        string(name: 'AMOUNT', defaultValue: '0.0', description: 'Enter the amount for Deposit or Withdrawal (Ignored for Check Balance)')
-    }
-
     environment {
-        INITIAL_BALANCE = '1000.0'
+        // Define your Docker Hub configuration
+        DOCKER_USER      = 'your_dockerhub_username' // Change to your actual username
+        IMAGE_NAME       = 'banking-app'
+        UNIQUE_TAG       = "v1.0.${BUILD_NUMBER}"
     }
 
     stages {
-        stage('Initialize') {
+        stage('Stage 1 & 2: Checkout') {
             steps {
-                echo 'Starting Automated Banking Transaction...'
-                echo "Current base balance: ₹${env.INITIAL_BALANCE}"
+                // Jenkins automatically pulls code from your Git Repository configuration
+                echo "Source code fetched successfully from Git."
             }
         }
 
-        stage('Execute Transaction') {
+        stage('Stage 3: Continuous Integration (Test)') {
+            steps {
+                echo 'Setting up environment and running automated tests...'
+                // Using Docker to cleanly run your Python test suite without messy dependencies
+                sh '''
+                    docker run --rm -v $(pwd):/app -w /app python:3.10-slim sh -c "
+                    pip install -r requirements.txt &&
+                    pytest tests/
+                    "
+                '''
+            }
+        }
+
+        stage('Stage 4: Build Container Image') {
             steps {
                 script {
-                    // Create an inline Python runner script to handle state and parameters
-                    def pythonScript = """
-balance = float(${env.INITIAL_BALANCE})
-choice = '${params.TRANSACTION_TYPE}'
-amount = float(${params.AMOUNT})
-
-print(f"\\n--- Processing {choice} ---")
-
-if choice == 'Check Balance':
-    print(f"Current Balance: ₹{balance:.2f}")
-
-elif choice == 'Deposit':
-    if amount > 0:
-        balance += amount
-        print(f"Successfully deposited ₹{amount:.2f}.")
-        print(f"Updated Balance: ₹{balance:.2f}")
-    else:
-        print("Error: Deposit amount must be positive.")
-        current.result = 'FAILURE'
-
-elif choice == 'Withdraw':
-    if amount > 0:
-        if balance >= amount:
-            balance -= amount
-            print(f"Successfully withdrew ₹{amount:.2f}.")
-            print(f"Updated Balance: ₹{balance:.2f}")
-        else:
-            print("Error: Insufficient balance! Transaction failed.")
-            error("Pipeline aborted due to insufficient funds.")
-    else:
-        print("Error: Withdrawal amount must be positive.")
-        error("Pipeline aborted due to invalid amount.")
-"""
-                    // Write to file and execute via python3
-                    writeFile file: 'bank_runner.py', text: pythonScript
-                    sh 'python3 bank_runner.py'
+                    echo "Building Docker Image: ${DOCKER_USER}/${IMAGE_NAME}:${UNIQUE_TAG}"
+                    // Build local images tagged with both the unique build ID and latest
+                    sh "docker build -t ${DOCKER_USER}/${IMAGE_NAME}:${UNIQUE_TAG} -t ${DOCKER_USER}/${IMAGE_NAME}:latest ."
+                    
+                    // Log in and push image out to Docker Hub
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER_ENV')]) {
+                        sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER_ENV --password-stdin"
+                        sh "docker push ${DOCKER_USER}/${IMAGE_NAME}:${UNIQUE_TAG}"
+                        sh "docker push ${DOCKER_USER}/${IMAGE_NAME}:latest"
+                    }
                 }
             }
+        }
+
+        stage('Stage 5: Kubernetes Deployment') {
+            steps {
+                script {
+                    echo "Deploying Build Tag ${UNIQUE_TAG} to Kubernetes..."
+                    
+                    // Securely connect to your K8s cluster using the stored config file
+                    withKubeConfig([credentialsId: 'kubeconfig-credential']) {
+                        // Dynamically inject the unique built image tag into the deployment manifest
+                        sh "sed -i 's|DOCKERHUB_USERNAME/banking-app:IMAGE_TAG|${DOCKER_USER}/${IMAGE_NAME}:${UNIQUE_TAG}|g' deployment.yaml"
+                        
+                        // Apply updates directly into your cluster
+                        sh "kubectl apply -f deployment.yaml"
+                        sh "kubectl apply -f service.yaml"
+                        
+                        // Monitor the rolling update rollout to ensure it completes successfully
+                        sh "kubectl rollout status deployment/banking-app-deployment"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Cleaning up local workspace images..."
+            sh "docker rmi ${DOCKER_USER}/${IMAGE_NAME}:${UNIQUE_TAG} || true"
+        }
+        success {
+            echo "Pipeline complete! Build ${UNIQUE_TAG} is live on Kubernetes."
+        }
+        failure {
+            echo "Pipeline failed. Review stage logs for diagnostics."
         }
     }
 }
