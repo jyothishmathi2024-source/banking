@@ -11,15 +11,21 @@ class BankAccount:
             return True, f"Successfully deposited ₹{amount:.2f}."
         return False, "Deposit amount must be positive."
 
+    def withdraw(self, amount):
+        if amount <= 0:
+            return False, "Withdrawal amount must be positive."
+        if amount > self.balance:
+            return False, "Insufficient balance! Transaction failed."
+        self.balance -= amount
+        return True, f"Successfully withdrew ₹{amount:.2f}."
+
 def run_menu():
     account = BankAccount()
-    print("--- Welcome to the Banking App (v1.0 - Deposit Only) ---")
+    print("--- Welcome to the Banking App (v2.0 - Full Features) ---")
     
-    # We use a limited loop or simulation for non-interactive runner safety if needed,
-    # but a simple standard CLI flow works natively inside docker run -it.
     while True:
-        print("\n1. Check Balance\n2. Deposit Money\n3. Exit")
-        choice = input("Enter choice (1-3): ")
+        print("\n1. Check Balance\n2. Deposit Money\n3. Withdraw Money\n4. Exit")
+        choice = input("Enter choice (1-4): ")
         
         if choice == '1':
             print(f"Current Balance: ₹{account.check_balance():.2f}")
@@ -31,6 +37,13 @@ def run_menu():
             except ValueError:
                 print("Invalid numeric amount.")
         elif choice == '3':
+            try:
+                amt = float(input("Enter withdrawal amount: ₹"))
+                success, msg = account.withdraw(amt)
+                print(msg)
+            except ValueError:
+                print("Invalid numeric amount.")
+        elif choice == '4':
             print("Goodbye!")
             break
         else:
