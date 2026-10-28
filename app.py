@@ -1,44 +1,40 @@
-def main():
-    balance = 1000.0  # Initial account balance
+class BankAccount:
+    def __init__(self, initial_balance=1000.0):
+        self.balance = initial_balance
 
+    def check_balance(self):
+        return self.balance
+
+    def deposit(self, amount):
+        if amount > 0:
+            self.balance += amount
+            return True, f"Successfully deposited ₹{amount:.2f}."
+        return False, "Deposit amount must be positive."
+
+def run_menu():
+    account = BankAccount()
+    print("--- Welcome to the Banking App (v1.0 - Deposit Only) ---")
+    
+    # We use a limited loop or simulation for non-interactive runner safety if needed,
+    # but a simple standard CLI flow works natively inside docker run -it.
     while True:
-        print("\n--- Banking Menu ---")
-        print("1. Check Balance")
-        print("2. Deposit Money")
-        print("3. Withdraw Money")
-        print("4. Exit")
+        print("\n1. Check Balance\n2. Deposit Money\n3. Exit")
+        choice = input("Enter choice (1-3): ")
         
-        choice = input("Enter your choice (1-4): ")
-
         if choice == '1':
-            print(f"\nYour current balance is: ₹{balance:.2f}")
-
+            print(f"Current Balance: ₹{account.check_balance():.2f}")
         elif choice == '2':
-            amount = float(input("Enter amount to deposit: ₹"))
-            if amount > 0:
-                balance += amount
-                print(f"Successfully deposited ₹{amount:.2f}.")
-            else:
-                print("Deposit amount must be positive.")
-
+            try:
+                amt = float(input("Enter deposit amount: ₹"))
+                success, msg = account.deposit(amt)
+                print(msg)
+            except ValueError:
+                print("Invalid numeric amount.")
         elif choice == '3':
-            amount = float(input("Enter amount to withdraw: ₹"))
-            if amount > 0:
-                if balance >= amount:  # Balance validation
-                    balance -= amount
-                    print(f"Successfully withdrew ₹{amount:.2f}.")
-                else:
-                    print("\nInsufficient balance! Transaction failed.")
-            else:
-                print("Withdrawal amount must be positive.")
-
-        elif choice == '4':
-            print("Thank you for using the banking system. Goodbye!")
+            print("Goodbye!")
             break
-
         else:
-            print("Invalid choice. Please select 1, 2, 3, or 4.")
+            print("Invalid Option.")
 
 if __name__ == "__main__":
-    main()
-
+    run_menu()
