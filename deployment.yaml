@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-app-deployment
+  labels:
+    app: banking-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: banking-app
+  template:
+    metadata:
+      labels:
+        app: banking-app
+    spec:
+      containers:
+      - name: banking-app
+        image: DOCKERHUB_USERNAME/banking-app:IMAGE_TAG
+        imagePullPolicy: Always
+        stdin: true
+        tty: true
